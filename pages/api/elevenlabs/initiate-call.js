@@ -1,10 +1,15 @@
-// /pages/api/elevenlabs/initiate-call.js
-
 export default async function handler(req, res) {
-    if (req.method !== 'POST') {
-      return res.status(405).json({ message: 'Method Not Allowed' });
+    // Voeg CORS headers toe
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  
+    // Handle preflight (OPTIONS) requests
+    if (req.method === "OPTIONS") {
+      return res.status(200).end();
     }
   
+    // En nu je bestaande logica
     const { klant_naam, klant_telefoon } = req.body;
   
     if (!klant_naam || !klant_telefoon) {
@@ -19,7 +24,7 @@ export default async function handler(req, res) {
           "xi-api-key": process.env.ELEVENLABS_API_KEY,
         },
         body: JSON.stringify({
-          agent_id: "YOUR_AGENT_ID", // ← Vul jouw eigen agent ID in
+          agent_id: "YOUR_AGENT_ID", // ← vervang dit!
           phone_number: klant_telefoon,
           variables: {
             klant_naam: klant_naam
