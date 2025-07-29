@@ -24,7 +24,7 @@ export default async function handler(req, res) {
           "xi-api-key": process.env.ELEVENLABS_API_KEY,
         },
         body: JSON.stringify({
-          agent_id: "YOUR_AGENT_ID", // ← vervang dit!
+          agent_id: "agent_01jzg3744affs8sgh2zh33xa56", // ← vervang dit!
           phone_number: klant_telefoon,
           variables: {
             klant_naam: klant_naam
