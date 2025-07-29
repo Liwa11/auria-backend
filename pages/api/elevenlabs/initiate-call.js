@@ -30,7 +30,10 @@ export default async function handler(req, res) {
   const vr = new VoiceResponse();
 
   /* live stream naar ElevenLabs AI */
-  vr.start().stream({ url: process.env.ELEVENLABS_WSS });
+  vr.start().stream({
+    url: process.env.ELEVENLABS_WSS,
+    track: "both"          // verplicht
+  });
 
   /* korte aankondiging zodat er meteen geluid is */
   vr.say(
