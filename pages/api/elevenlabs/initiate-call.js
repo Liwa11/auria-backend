@@ -33,24 +33,22 @@ export default async function handler(req, res) {
   /* 4) Outbound-call rechtstreeks via ElevenLabs */
   try {
     const elRes = await fetch(
-      "https://api.elevenlabs.io/v1/convai/twilio/outbound-call",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          /**  let op → ElevenLabs verwacht **xi-api-key**  */
-          "xi-api-key": ELEVENLABS_API_KEY,
-        },
-        body: JSON.stringify({
-          phone_number_id: ELEVENLABS_PHONE_NUM_ID,
-          agent_id: ELEVENLABS_AGENT_ID,
-          customer: {
-            number: klant_telefoon,
-            name: klant_naam,
+        "https://api.elevenlabs.io/v1/convai/twilio/outbound-call",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "xi-api-key": process.env.ELEVENLABS_API_KEY
           },
-        }),
-      }
-    );
+          body: JSON.stringify({
+            agent_phone_number_id: process.env.ELEVENLABS_PHONE_NUM_ID,
+            customer: {
+              number: klant_telefoon,
+              name: klant_naam
+            }
+          })
+        }
+      );
 
     if (!elRes.ok) {
       const text = await elRes.text();
