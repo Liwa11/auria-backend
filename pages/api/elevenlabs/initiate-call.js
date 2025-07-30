@@ -33,7 +33,7 @@ export default async function handler(req, res) {
   /* 4) Outbound-call rechtstreeks via ElevenLabs */
   try {
     const elRes = await fetch(
-      "https://api.elevenlabs.io/v1/telephony/call/outbound",
+      "https://api.elevenlabs.io/v1/convai/twilio/outbound-call",
       {
         method: "POST",
         headers: {
