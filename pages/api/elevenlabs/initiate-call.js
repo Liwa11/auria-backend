@@ -1,64 +1,53 @@
 /* /pages/api/elevenlabs/initiate-call.js */
-import twilio from "twilio";
-
-const twilioClient = twilio(
-  process.env.TWILIO_ACCOUNT_SID,
-  process.env.TWILIO_AUTH_TOKEN
-);
+import fetch from "node-fetch";
 
 export default async function handler(req, res) {
-  /* ---------- CORS ---------- */
+  /* ───────── CORS ───────── */
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-
-  /* OPTIONS = pre-flight → direct OK */
   if (req.method === "OPTIONS") return res.status(200).end();
 
-  /* alleen POST toelaten */
   if (req.method !== "POST")
-    return res.status(405).json({ message: "Method Not Allowed" });
+    return res.status(405).json({ error: "Method Not Allowed" });
 
-  /* ---------- payload ---------- */
-  const { klant_naam, klant_telefoon } = req.body;
-  if (!klant_naam || !klant_telefoon) {
-    return res.status(400).json({ message: "Missing klant data" });
-  }
+  /* ───────── payload ───────── */
+  const { klant_naam = "Prospect", klant_telefoon } = req.body;
+  if (!klant_telefoon)
+    return res.status(400).json({ error: "klant_telefoon ontbreekt" });
 
-  /* ---------- TwiML ---------- */
-  const VoiceResponse = twilio.twiml.VoiceResponse;
-  const vr = new VoiceResponse();
-
-  /* live stream naar ElevenLabs AI */
-  vr.start().stream({
-    url: process.env.ELEVENLABS_WSS,
-    track: "both"          // verplicht
-  });
-
-  /* houd lijn open voor max. 1 uur (= 3600 s) */
-  vr.pause({ length: 3600 });
-  
-
+  /* ───────── ElevenLabs outbound call ───────── */
   try {
-    /* klant bellen */
-    const call = await twilioClient.calls.create({
-      to: klant_telefoon,
-      from: process.env.TWILIO_PHONE_NUMBER,
-      twiml: vr.toString(),
-    });
+    const elResp = await fetch(
+      "https://api.elevenlabs.io/v1/telephony/call/outbound",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${process.env.ELEVENLABS_API_KEY}`,
+        },
+        body: JSON.stringify({
+          phone_number_id: process.env.ELEVENLABS_PHONE_NUM_ID,
+          agent_id: process.env.ELEVENLABS_AGENT_ID,
+          customer: {
+            number: klant_telefoon,
+            name: klant_naam,
+          },
+        }),
+      }
+    );
 
-    /* optioneel: operator stil meeluisteren */
-    await twilioClient.calls.create({
-      to: process.env.OPERATOR_NUMBER,
-      from: process.env.TWILIO_PHONE_NUMBER,
-      twiml: `<Response><Dial><Conference muted="true">${call.sid}</Conference></Dial></Response>`,
-    });
+    if (!elResp.ok) {
+      const text = await elResp.text();
+      throw new Error(
+        `ElevenLabs ${elResp.status}: ${text.substring(0, 200)}`
+      );
+    }
 
-    return res.status(200).json({ message: "Gesprek gestart", sid: call.sid });
+    const data = await elResp.json(); // bevat call_sid e.d.
+    return res.status(200).json({ message: "Gesprek gestart", data });
   } catch (err) {
-    console.error("Twilio/ElevenLabs error", err?.code, err?.message);
-    return res
-      .status(500)
-      .json({ message: "Server error", error: err.message });
+    console.error("Outbound-call error:", err.message);
+    return res.status(500).json({ error: err.message });
   }
 }
