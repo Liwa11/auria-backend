@@ -1,19 +1,18 @@
-/*  /pages/api/elevenlabs/initiate-call.js  */
-
+/* /pages/api/elevenlabs/initiate-call.js */
 export default async function handler(req, res) {
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Allow-Methods", "POST,OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "Content-Type");
     if (req.method === "OPTIONS") return res.status(200).end();
-    if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+    if (req.method !== "POST")  return res.status(405).json({ error: "Method not allowed" });
   
     const { klant_naam = "Prospect", klant_telefoon } = req.body;
     if (!klant_telefoon) return res.status(400).json({ error: "klant_telefoon ontbreekt" });
   
     const {
       ELEVENLABS_API_KEY,
-      ELEVENLABS_PHONE_NUM_ID,   // phnum_…
-      ELEVENLABS_AGENT_ID        // agent_01…
+      ELEVENLABS_PHONE_NUM_ID,
+      ELEVENLABS_AGENT_ID
     } = process.env;
   
     try {
@@ -28,10 +27,8 @@ export default async function handler(req, res) {
           body: JSON.stringify({
             agent_phone_number_id: ELEVENLABS_PHONE_NUM_ID,
             agent_id:              ELEVENLABS_AGENT_ID,
-            customer: {
-              number: klant_telefoon,
-              name:   klant_naam
-            }
+            to_number:             klant_telefoon,
+            customer_name:         klant_naam
           })
         }
       );
