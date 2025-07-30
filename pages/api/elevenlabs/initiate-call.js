@@ -35,7 +35,8 @@ export default async function handler(req, res) {
     track: "both"          // verplicht
   });
 
-  /* korte aankondiging zodat er meteen geluid is */
+  /* houd lijn open voor max. 1 uur (= 3600 s) */
+  vr.pause({ length: 3600 });
   
 
   try {
