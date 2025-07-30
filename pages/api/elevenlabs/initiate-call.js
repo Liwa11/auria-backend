@@ -36,10 +36,7 @@ export default async function handler(req, res) {
   });
 
   /* korte aankondiging zodat er meteen geluid is */
-  vr.say(
-    { voice: "Polly.Rachel" },
-    `Hallo ${klant_naam}, één moment terwijl ik verbinding maak.`
-  );
+  
 
   try {
     /* klant bellen */
