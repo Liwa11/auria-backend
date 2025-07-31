@@ -26,6 +26,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const hmac = crypto.createHmac("sha256", process.env.ELEVENLABS_WEBHOOK_SECRET!)
                      .update(rawBody)
                      .digest("hex");
+
+                     console.log("sig header:", sig);
+                     console.log("calc hmac :", hmac);
   if (sig !== hmac) return res.status(401).end("invalid signature");
 
   /* --------- Payload verwerken --------- */
