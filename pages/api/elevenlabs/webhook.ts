@@ -1,94 +1,50 @@
-import { createClient } from "@supabase/supabase-js";
+// pages/api/elevenlabs/webhook.ts
 import type { NextApiRequest, NextApiResponse } from "next";
-import crypto from "crypto";
+import { createHmac, timingSafeEqual } from "crypto";
+import getRaw from "raw-body";
 
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE!,   // server-side
-  { auth: { persistSession: false } }
-);
-
-export const config = {
-  api: { bodyParser: false }   // nodig voor raw body signature-check
-};
+export const config = { api: { bodyParser: false } }; // <- we lezen zelf de raw body
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-    console.log("ALL HEADERS:", JSON.stringify(req.headers, null, 2));
-  // ---------- CORS ----------
+  // ───────── allow CORS/OPTIONS ─────────
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
   if (req.method === "OPTIONS") return res.status(200).end();
-  if (req.method !== "POST")     return res.status(405).json({ error: "Method not allowed" });
+  if (req.method !== "POST")   return res.status(405).end("Method not allowed");
 
-  /* --------- HMAC-signature controleren --------- */
-  const rawBody = await getRawBody(req);
-  const sig = (req.headers["x-elevenlabs-signature"] as string || "").replace("SHA256=", "");
-  const hmac = crypto.createHmac("sha256", process.env.ELEVENLABS_WEBHOOK_SECRET!)
-                     .update(rawBody)
-                     .digest("hex");
+  /* ---------- signature controle ---------- */
+  const sigHeader = (req.headers["elevenlabs-signature"] ?? "") as string;   // ✔ juiste header
+  const [tsPart, v0Part] = sigHeader.split(",");
+  const timestamp = tsPart?.replace(/^t=/, "");
+  const sig        = v0Part?.replace(/^v0=/, "");
 
-                     console.log("sig header:", sig);
-                     console.log("calc hmac :", hmac);
-  if (sig !== hmac) return res.status(401).end("invalid signature");
+  if (!timestamp || !sig) return res.status(400).end("Bad signature format");
 
-  /* --------- Payload verwerken --------- */
-  const payload = JSON.parse(rawBody.toString());
+  const rawBody = await getRaw(req);
+  const payloadToSign = `${timestamp}.${rawBody.toString()}`;
 
-  // We verwerken alleen het einde-event; andere events kun je negeren OF loggen
-  if (payload.event_type !== "conversation_completed")
-    return res.status(200).json({ ignored: payload.event_type });
+  const calcHmac = createHmac("sha256", process.env.ELEVENLABS_WEBHOOK_SECRET!)
+                    .update(payloadToSign)
+                    .digest("hex");
 
-  const {
-    call_sid,                      // ← komt uit ElevenLabs
-    conversation_id,
-    customer_name,
-    to_number,
-    transcript,                    // of payload.transcript_text
-    result_code                    // als je dit al doorgeeft
-  } = payload;
-
-  // 1️⃣  Sla ruwe log altijd op (optioneel):
-  await supabase.from("logs").insert({
-    type:        "elevenlabs",
-    status:      "webhook",
-    message:     "conversation_completed",
-    data:        payload,
-    twilio_sid:  call_sid
-  });
-
-  // 2️⃣  Upsert in gesprekken / verkoop_resultaten
-  //     → zoek gesprek op twilio_sid (= call_sid) of op klant_id
-  const { data: gesprek } = await supabase
-    .from("gesprekken")
-    .select("id")
-    .eq("twilio_sid", call_sid)
-    .single();
-
-  if (gesprek) {
-    await supabase.from("gesprekken")
-      .update({
-        status:        "afgerond",
-        resultaatcode: result_code ?? null,
-        opmerkingen:   transcript
-      })
-      .eq("id", gesprek.id);
-  } else {
-    // fallback – nieuw gesprekrecord
-    await supabase.from("gesprekken").insert({
-      twilio_sid:    call_sid,
-      datum:         new Date(),
-      resultaatcode: result_code ?? null,
-      opmerkingen:   transcript,
-      status:        "afgerond"
-    });
+  if (
+    calcHmac.length !== sig.length ||
+    !timingSafeEqual(Buffer.from(calcHmac, "hex"), Buffer.from(sig, "hex"))
+  ) {
+    console.log("signature mismatch");               // ← tijdelijk loggen
+    return res.status(401).end("invalid signature");
   }
 
-  return res.status(200).json({ stored: true });
-}
+  /* ---------- payload verwerken ---------- */
+  const payload = JSON.parse(rawBody.toString());
 
-/* ---------- helper ---------- */
-import getRaw from "raw-body";
-function getRawBody(req: NextApiRequest) {
-  return getRaw(req);
+  if (payload.event_type !== "conversation_completed") {
+    return res.status(200).json({ ignored: payload.event_type });
+  }
+
+  // hier zit o.a. payload.transcript_text, payload.call_sid, payload.result_code …
+  // → schrijf naar Supabase of wat je maar wilt
+
+  return res.status(200).json({ ok: true });
 }
