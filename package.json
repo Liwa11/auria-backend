@@ -11,6 +11,7 @@
     "dependencies": {
         "@supabase/supabase-js": "^2.53.0",
         "next": "latest",
+        "raw-body": "^3.0.0",
         "react": "latest",
         "react-dom": "latest",
         "twilio": "^5.8.0"
